@@ -36,7 +36,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
@@ -49,10 +49,10 @@ public class RackspaceAdapter implements BridgeAdapter {
     /*----------------------------------------------------------------------------------------------
      * PROPERTIES
      *--------------------------------------------------------------------------------------------*/
-    
+
     /** Defines the adapter display name */
     public static final String NAME = "Rackspace Bridge";
-    
+
     /** Defines the logger */
     protected static final org.slf4j.Logger logger = LoggerFactory.getLogger(RackspaceAdapter.class);
 
@@ -69,83 +69,83 @@ public class RackspaceAdapter implements BridgeAdapter {
             VERSION = "Unknown";
         }
     }
-    
+
     /** Defines the collection of property names for the adapter */
     public static class Properties {
         public static final String PROPERTY_USERNAME = "Username";
         public static final String PROPERTY_PASSWORD = "Password";
         public static final String PROPERTY_REGIONS = "Regions";
     }
- 
+
     private final ConfigurablePropertyMap properties = new ConfigurablePropertyMap(
         new ConfigurableProperty(Properties.PROPERTY_USERNAME).setIsRequired(true),
         new ConfigurableProperty(Properties.PROPERTY_PASSWORD).setIsRequired(true).setIsSensitive(true),
         new ConfigurableProperty(Properties.PROPERTY_REGIONS).setIsRequired(true)
     );
-    
+
     private String regions;
-    
+
     /**
      * The AuthInfo object that will be used to authorize the calls
      * throughout the use of the Bridge
      */
     private AuthInfo authInfo;
-    
+
     /**
      * Structures that are valid to use in the bridge
      */
     public static final List<String> VALID_STRUCTURES = Arrays.asList(new String[] {
         "servers","images","flavors"
     });
-    
+
     /*---------------------------------------------------------------------------------------------
      * SETUP METHODS
      *-------------------------------------------------------------------------------------------*/
-     
+
     @Override
     public void initialize() throws BridgeError {
         this.regions = properties.getValue(Properties.PROPERTY_REGIONS);
 //        testAuth();
     }
-    
+
     @Override
     public String getName() {
         return NAME;
     }
-    
+
     @Override
     public String getVersion() {
         return VERSION;
     }
-    
+
     @Override
     public void setProperties(Map<String,String> parameters) {
         properties.setValues(parameters);
     }
-    
+
     @Override
     public ConfigurablePropertyMap getProperties() {
         return properties;
     }
-    
+
     /*---------------------------------------------------------------------------------------------
      * IMPLEMENTATION METHODS
      *-------------------------------------------------------------------------------------------*/
-    
+
 
     @Override
     public Count count(BridgeRequest request) throws BridgeError {
         if (!VALID_STRUCTURES.contains(request.getStructure())) {
             throw new BridgeError("Invalid Structure: " + request.getStructure() + " is not a valid structure");
         }
-        
+
         // URIs to perform GETs on
         String[] regionList = this.regions.split(",");
-        
-        // Parsing the query to include parameters if they have been used. 
+
+        // Parsing the query to include parameters if they have been used.
         RackspaceQualificationParser parser = new RackspaceQualificationParser();
         String query = parser.parse(request.getQuery(),request.getParameters());
-        
+
         ExecutorService pool = Executors.newFixedThreadPool(regionList.length);
         Set<Future<String>> set = new HashSet<Future<String>>();
         for (String region : regionList) {
@@ -153,7 +153,7 @@ public class RackspaceAdapter implements BridgeAdapter {
             Future<String> future = pool.submit(callable);
             set.add(future);
         }
-        
+
         Integer count = 0;
         for (Future<String> future : set) {
             try {
@@ -162,9 +162,9 @@ public class RackspaceAdapter implements BridgeAdapter {
                 count = count + servers.size();
             } catch (Exception e) {
                 throw new BridgeError(e);
-            } 
+            }
         }
-        
+
         //Return the response
         return new Count(Long.valueOf(count));
     }
@@ -172,18 +172,18 @@ public class RackspaceAdapter implements BridgeAdapter {
     @Override
     public Record retrieve(BridgeRequest request) throws BridgeError {
         List<String> fields = request.getFields();
-        
+
         if (!VALID_STRUCTURES.contains(request.getStructure())) {
             throw new BridgeError("Invalid Structure: " + request.getStructure() + " is not a valid structure");
         }
-        
+
         // URIs to perform GETs on
         String[] regionList = this.regions.split(",");
-        
-        // Parsing the query to include parameters if they have been used. 
+
+        // Parsing the query to include parameters if they have been used.
         RackspaceQualificationParser parser = new RackspaceQualificationParser();
         String query = parser.parse(request.getQuery(),request.getParameters());
-        
+
         ExecutorService pool = Executors.newFixedThreadPool(regionList.length);
         Set<Future<String>> set = new HashSet<Future<String>>();
         for (String region : regionList) {
@@ -191,9 +191,9 @@ public class RackspaceAdapter implements BridgeAdapter {
             Future<String> future = pool.submit(callable);
             set.add(future);
         }
-        
+
         Record record = new Record(null);
-        
+
         for (Future<String> future : set) {
             try {
                 JSONObject jsonObj = (JSONObject)JSONValue.parse(future.get());
@@ -202,7 +202,7 @@ public class RackspaceAdapter implements BridgeAdapter {
                 if (!servers.isEmpty()) {
                     if (servers.size() > 1) {
                         throw new BridgeError("Multiple results matched an expected single match query");
-                    } 
+                    }
                     else if (servers.size() ==1 && record != null) {
                         throw new BridgeError("Multiple results matched an expected single match query");
                     }
@@ -222,7 +222,7 @@ public class RackspaceAdapter implements BridgeAdapter {
                 logger.error(e.getMessage());
             }
         }
-        
+
         // Returning the response
         return record;
 
@@ -231,18 +231,18 @@ public class RackspaceAdapter implements BridgeAdapter {
     @Override
     public RecordList search(BridgeRequest request) throws BridgeError {
         List<String> fields = request.getFields();
-        
+
         if (!VALID_STRUCTURES.contains(request.getStructure())) {
             throw new BridgeError("Invalid Structure: " + request.getStructure() + " is not a valid structure");
         }
-        
+
         // URIs to perform GETs on
         String[] regionList = this.regions.split(",");
-        
-        // Parsing the query to include parameters if they have been used. 
+
+        // Parsing the query to include parameters if they have been used.
         RackspaceQualificationParser parser = new RackspaceQualificationParser();
         String query = parser.parse(request.getQuery(),request.getParameters());
-        
+
         ExecutorService pool = Executors.newFixedThreadPool(regionList.length);
         Set<Future<String>> set = new HashSet<Future<String>>();
         for (String region : regionList) {
@@ -250,9 +250,9 @@ public class RackspaceAdapter implements BridgeAdapter {
             Future<String> future = pool.submit(callable);
             set.add(future);
         }
-        
-        ArrayList<Record> records = new ArrayList<Record>(); 
-        
+
+        ArrayList<Record> records = new ArrayList<Record>();
+
         for (Future<String> future : set) {
             try {
                 JSONObject jsonObj = (JSONObject)JSONValue.parse(future.get());
@@ -275,7 +275,7 @@ public class RackspaceAdapter implements BridgeAdapter {
                 throw new BridgeError(e);
             }
         }
-       
+
         // Building the output metadata
         Map<String,String> metadata = BridgeUtils.normalizePaginationMetadata(request.getMetadata());
         metadata.put("pageSize", String.valueOf("0"));
@@ -283,15 +283,15 @@ public class RackspaceAdapter implements BridgeAdapter {
         metadata.put("offset", String.valueOf("0"));
         metadata.put("size", String.valueOf(records.size()));
         metadata.put("count", metadata.get("size"));
-        
+
         // Returning the response
         return new RecordList(fields, records, metadata);
     }
-    
+
     /*----------------------------------------------------------------------------------------------
      * PRIVATE HELPER METHODS
      *--------------------------------------------------------------------------------------------*/
-    
+
     protected String encodeQuery(String query) {
         StringBuilder encodedQuery = new StringBuilder();
         if (!query.equals("*")) {
@@ -308,8 +308,8 @@ public class RackspaceAdapter implements BridgeAdapter {
         }
         return encodedQuery.toString();
     }
-    
-    /** 
+
+    /**
      * A helper method used to parse the list of returned vm's based on the
      * inputted query.
      *
@@ -345,7 +345,7 @@ public class RackspaceAdapter implements BridgeAdapter {
         });
         return searchResults;
     }
-    
+
 }
 
 class GetServersCallable implements Callable<String> {
@@ -354,7 +354,7 @@ class GetServersCallable implements Callable<String> {
     private AuthInfo authInfo;
     private String query;
     private String structure;
-    
+
     protected GetServersCallable(String region, AuthInfo authInfo, String structure, String query) {
         this.region = region;
         this.authInfo = authInfo;
@@ -365,17 +365,17 @@ class GetServersCallable implements Callable<String> {
             this.query = "";
         }
     }
-    
+
     @Override
     public String call() {
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         HttpContext localContext = new BasicHttpContext();
         String url = String.format("https://%s.servers.api.rackspacecloud.com/v2/%s/%s/detail%s",this.region,this.authInfo.getAccountNumber(),this.structure,this.query);
         System.out.println(url);
         HttpGet get = new HttpGet(url);
         get.setHeader("X-Auth-Token",this.authInfo.getToken());
         get.setHeader("Content-Type","application/json");
-        
+
         String jsonStr = "";
         try {
             HttpResponse response = client.execute(get,localContext);
@@ -384,7 +384,7 @@ class GetServersCallable implements Callable<String> {
         } catch (IOException e) {
             logger.error(e.getMessage());
         }
-        
+
         return jsonStr;
     }
 }
@@ -397,12 +397,12 @@ class AuthInfo {
     private String password;
     private String authResponse;
     protected static final org.slf4j.Logger logger = LoggerFactory.getLogger(RackspaceAdapter.class);
-    
+
     protected AuthInfo(String username, String password) {
         this.username = username;
         this.password = password;
     }
-    
+
     public void authenticate() throws BridgeError {
         // Creating the JSON object that will be sent containing the authorization
         // credentials for getting the token from Rackspace
@@ -414,11 +414,11 @@ class AuthInfo {
         auth.put("passwordCredentials", creds);
         data.put("auth", auth);
         String jsonData = JSONValue.toJSONString(data);
-        
-        HttpClient client = new DefaultHttpClient();
+
+        HttpClient client = HttpClients.createDefault();
         HttpPost post = new HttpPost("https://identity.api.rackspacecloud.com/v2.0/tokens");
         HttpResponse response;
-        
+
         try {
             // Setting up and executing the SOAP request
             StringEntity postBody = new StringEntity(jsonData);
@@ -430,41 +430,41 @@ class AuthInfo {
         } catch (IOException e) {
             throw new BridgeError(e);
         }
-                
+
         try {
             this.authResponse = EntityUtils.toString(response.getEntity());
         } catch (IOException e) {
             throw new BridgeError("Error converting the Rackspace response to a string",e);
         }
-        
+
         if (response.getStatusLine().getStatusCode() == 401) {
             throw new BridgeError("Unable to authenticate user with credentials provided");
         } else if (response.getStatusLine().getStatusCode() != 200) {
             throw new BridgeError("Connection Error: Encountered error code " + Integer.toString(response.getStatusLine().getStatusCode()) + ". See log for details.");
         }
-        
+
         // Parsing through the nested JSON structure to get to the 'token'
         // and 'expired' values
         JSONObject jsonObj = (JSONObject)JSONValue.parse(this.authResponse);
         JSONObject accessObj = (JSONObject)JSONValue.parse(JSONValue.toJSONString(jsonObj.get("access")));
-        JSONObject tokenObj = (JSONObject)JSONValue.parse(JSONValue.toJSONString(accessObj.get("token")));  
-        
+        JSONObject tokenObj = (JSONObject)JSONValue.parse(JSONValue.toJSONString(accessObj.get("token")));
+
         this.token = tokenObj.get("id").toString();
         this.expires = tokenObj.get("expires").toString();
-        
+
         JSONObject accountObj = (JSONObject)JSONValue.parse(JSONValue.toJSONString(tokenObj.get("tenant")));
         this.account = accountObj.get("id").toString();
     }
-    
+
     public String getToken() {
         return this.token;
     }
-    
+
     public String getAccountNumber() {
         return this.account;
     }
-    
-    // Check if the token should be expired, 
+
+    // Check if the token should be expired,
     public Boolean checkForExpiredToken() throws BridgeError{
         DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
         formatter.setTimeZone(TimeZone.getTimeZone("gmt"));
@@ -474,7 +474,7 @@ class AuthInfo {
         } catch (java.text.ParseException e) {
             throw new BridgeError(e);
         }
-        
+
         Date currentDate = new Date();
         Boolean change = false;
         if (currentDate.after(expireDate)) {
@@ -485,7 +485,7 @@ class AuthInfo {
     }
 
     public void checkRegions(String regions) throws BridgeError {
-        // Parsing through the nested JSON structure to get all the possible 
+        // Parsing through the nested JSON structure to get all the possible
         // region values.
         ArrayList<String> regionList = new ArrayList<String>();
         JSONObject jsonObj = (JSONObject)JSONValue.parse(this.authResponse);
